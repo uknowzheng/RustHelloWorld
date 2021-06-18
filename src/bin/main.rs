@@ -1,13 +1,19 @@
-use std::fs;
+use hello::ThreadPool;
 use std::io::prelude::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::{fs, thread};
 
 fn main() {
   let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
-  for stream in listener.incoming() {
+  let pool = ThreadPool::new(4);
+  for stream in listener.incoming().take(2) {
     let _stream = stream.unwrap();
-    handel_connection(_stream);
+    pool.execute(|| {
+      handel_connection(_stream);
+    });
   }
+
+  println!("Shutting down.");
 }
 
 fn handel_connection(mut stream: TcpStream) {
@@ -20,13 +26,9 @@ fn handel_connection(mut stream: TcpStream) {
   } else {
     ("HTTP/1.1 404 NOT FOUND", "404.html")
   };
-  println!("{}",filename);
+  println!("{}", filename);
   let contents = fs::read_to_string(filename).unwrap();
-  let response = format!(
-    "{}\r\n\r\n{}",
-    status_line,
-    contents
-  );
+  let response = format!("{}\r\n\r\n{}", status_line, contents);
   stream.write(response.as_bytes()).unwrap();
   stream.flush().unwrap();
 }
